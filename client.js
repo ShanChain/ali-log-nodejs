@@ -90,7 +90,6 @@ client._send = function( method, project, body, resource, params, headers, callb
     headers['x-log-bodyrawsize'] = 0;
     headers['Content-qType'] = '';  // If not set, http request will add automatically.
   }
-
   headers['User-Agent'] = USER_AGENT;
   headers['x-log-apiversion'] = API_VERSION;
   headers['x-log-signaturemethod'] = 'hmac-sha1';
@@ -98,13 +97,11 @@ client._send = function( method, project, body, resource, params, headers, callb
   if ( this.stsToken !== '' ) {
     headers['x-acs-security-token'] = this.stsToken;
   }
-
   if ( !project ) {
     headers['Host'] = this.logHost;
   } else {
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
-
   headers['Date'] = util.getGMT();
 
   let signature = util.getRequestAuthorization( method, resource, this.accessKeySecret, this.stsToken, params, headers );
