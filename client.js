@@ -148,31 +148,25 @@ client._sendRequest = function(method, url, body, headers, callback) {
     method : method,
     headers : headers
   }
-  if ( method === 'POST' || method === 'PUT' ) {
-    options['body'] = body;
-  }
-
+  if (method == 'POST' || method == 'PUT') options['body'] = body;
   request(options, function( err, response, body ) {
     if ( err ) {
-      callback && callback( err );
+      callback && callback( err ); return;
+    } 
+    try {
+      body = JSON.parse( body );
+    } catch( err ) {}
+    let headers = response.headers;
+    if (response.statusCode === 200) {
+      callback && callback( null, headers, body );
     } else {
-      try {
-        body = JSON.parse( body );
-      } catch( err ) { 
-
-      }
-      let headers = response.headers;
-      if (response.statusCode === 200) {
-        callback && callback( null, headers, body );
+      let requestId = headers['x-log-requestid'] ? headers['x-log-requestid'] : '';
+      if ( body['errorCode'] && body['errorMessage'] ) {
+        let err = new Exception( body['errorCode'], body['errorMessage'], requestId );
+        callback && callback( err );
       } else {
-        let requestId = headers['x-log-requestid'] ? headers['x-log-requestid'] : '';
-        if ( body['errorCode'] && body['errorMessage'] ) {
-          let err = new Exception( body['errorCode'], body['errorMessage'], requestId );
-          callback && callback( err );
-        } else {
-          let err = new Exception( 'RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId );
-          callback && callback( err );
-        }
+        let err = new Exception( 'RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId );
+        callback && callback( err );
       }
     }
   })
