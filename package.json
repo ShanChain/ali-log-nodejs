@@ -1,8 +1,8 @@
 {
-  "name": "ali-log-sdk-nodejs",
+  "name": "ali-log-nodejs",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "client.js",
   "scripts": {
     "test": "mocha test"
   },
