@@ -1,2 +1,2 @@
-# ali-log-nodejs
-阿里云日志服务sdk 
+# ali-log-sdk-nodejs
+ali-log-sdk-nodejs
