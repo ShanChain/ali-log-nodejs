@@ -3,6 +3,7 @@
 let ip = require('ip');
 let md5 = require('md5');
 let _ = require('lodash');
+let zlib = require('zlib');
 let crypto = require('crypto');
 let Exception = require('./Exception');
 
@@ -129,6 +130,25 @@ module.exports = {
       }
     }
     return /^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(str);
+  },
+
+  /**
+   * deflate压缩
+   * @param  {Buffer}   pb 待压缩内容
+   * @param  {Function} fn 回调函数
+   */
+  deflate : function(pb, fn){
+    zlib.deflate(pb, function(err, buf) {
+      fn(err, buf);
+    });
+  },
+
+  /**
+   * 获取GMT格式时间
+   * @return {String}  
+   */
+  getGMT : function() {
+    return new Date().toUTCString();
   }
 
 }
