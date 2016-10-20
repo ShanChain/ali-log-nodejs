@@ -25,14 +25,14 @@ function Aliyun_Log_Client( options ) {
   this.accessKeySecret = options.accessKeySecret;
   this.stsToken = options.stsToken || '';
   this.source = util.getLocalIp();   // @var string the local machine ip address.
-  this.setEndpoint( options.endpoint );
+  this._setEndpoint( options.endpoint );
 }
 
 /**
  * 获取GMT格式时间
  * @return {String}  
  */
-client.getGMT = function() {
+client._getGMT = function() {
   return (new Date()).toUTCString();
 }
 
@@ -40,7 +40,7 @@ client.getGMT = function() {
  * SetEndpoint
  * @param {String} endpoint Endpoint
  */
-client.setEndpoint = function( endpoint ) {
+client._setEndpoint = function( endpoint ) {
   let pos;
   pos = endpoint.indexOf('://');
   if ( pos > -1 ) {
@@ -75,7 +75,7 @@ client.setEndpoint = function( endpoint ) {
  * @param  {Function} callback 回调函数
  * @return void
  */
-client.send = function( method, project, body, resource, params, headers, callback ) {
+client._send = function( method, project, body, resource, params, headers, callback ) {
   if (body) {
     headers['Content-Length'] = body.length;
     if (headers['x-log-bodyrawsize'] === undefined) {
@@ -102,7 +102,7 @@ client.send = function( method, project, body, resource, params, headers, callba
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
 
-  headers['Date'] = this.getGMT();
+  headers['Date'] = this._getGMT();
 
   let signature = util.getRequestAuthorization( method, resource, this.accessKeySecret, this.stsToken, params, headers );
   headers['Authorization'] = `LOG ${ this.accessKey }:${ signature }`;
@@ -120,7 +120,7 @@ client.send = function( method, project, body, resource, params, headers, callba
       url = `http://${ project }.${ this.endpoint }${ url }`;
     }
   }
-  this.sendRequest( method, url, body, headers, function(err, headers, result ) {
+  this._sendRequest( method, url, body, headers, function(err, headers, result ) {
     if ( err ) {
       callback && callback( err );
     } else {
@@ -139,7 +139,7 @@ client.send = function( method, project, body, resource, params, headers, callba
  * @param  {Function} callback  回调函数 
  * @return void
  */
-client.sendRequest = function(method, url, body, headers, callback) {
+client._sendRequest = function(method, url, body, headers, callback) {
   let options = {
     method : method,
     url : url,
@@ -196,7 +196,7 @@ client.listLogstores = function( callback ) {
   let method = 'GET';
   let resource = '/logstores';
   let project = this.project;
-  this.send( method, project, body, resource, params, headers, callback );
+  this._send( method, project, body, resource, params, headers, callback );
 }
 
 
@@ -222,7 +222,7 @@ client.CreateLogstore = function(options, callback) {
   } catch( err ) {
     callback && callback( err );
   }
-  this.send( method, project, body, resource, params, headers, callback );
+  this._send( method, project, body, resource, params, headers, callback );
 }
 
 /**
@@ -250,7 +250,7 @@ client.PostLogStoreLogs = function( logstoreName, data, callback ) {
   data.logs.forEach( function( each, index ) {
     let i = 0, log = new sls_pb.Log();
     log.setTime( parseInt( each.time / 1000 ) );
-    
+
     for ( let prop in each.content) {
       let content = new sls_pb.Log.Content();
       content.setKey( prop );
@@ -271,28 +271,6 @@ client.PostLogStoreLogs = function( logstoreName, data, callback ) {
   // headers ['x-log-compresstype'] = 'lz4';
   headers ['Content-Type'] = 'application/x-protobuf';
 
-  self.send( 'POST', self.project, body, resource, params, headers, callback);
+  self._send( 'POST', self.project, body, resource, params, headers, callback);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
