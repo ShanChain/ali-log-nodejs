@@ -1,5 +1,4 @@
 'use strict';
-let lz4 = require('lz4');
 let _ = require('lodash');
 let path = require('path');
 let util = require('./util');
