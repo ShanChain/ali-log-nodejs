@@ -1,14 +1,24 @@
 'use strict';
 let lz4 = require('lz4');
 let _ = require('lodash');
-let util = require('./Util');
+let path = require('path');
+let util = require('./util');
 let qs = require('querystring');
 let request = require('request');
+let protobuf = require('protobufjs');
 let Exception = require('./Exception');
-let sls_pb = require('./sls.proto.js');
+
 
 const API_VERSION = '0.6.0';
-const USER_AGENT = 'log-nodejs-sdk-v-0.1.0';
+const USER_AGENT = 'log-nodejs-sdk';
+//日志数据Message文件路径
+const SLS_PROTO = path.join( process.cwd(), 'sls.proto' );
+
+
+//构建Message对象
+let builder = protobuf.loadProtoFile( SLS_PROTO );
+let Log = builder.build('log');
+
 
 module.exports = Aliyun_Log_Client;
 
@@ -28,13 +38,7 @@ function Aliyun_Log_Client( options ) {
   this._setEndpoint( options.endpoint );
 }
 
-/**
- * 获取GMT格式时间
- * @return {String}  
- */
-client._getGMT = function() {
-  return (new Date()).toUTCString();
-}
+
 
 /**
  * SetEndpoint
@@ -85,7 +89,7 @@ client._send = function( method, project, body, resource, params, headers, callb
   } else {
     headers['Content-Length'] = 0;
     headers['x-log-bodyrawsize'] = 0;
-    headers['Content-Type'] = '';  // If not set, http request will add automatically.
+    headers['Content-qType'] = '';  // If not set, http request will add automatically.
   }
 
   headers['User-Agent'] = USER_AGENT;
@@ -102,7 +106,7 @@ client._send = function( method, project, body, resource, params, headers, callb
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
 
-  headers['Date'] = this._getGMT();
+  headers['Date'] = util.getGMT();
 
   let signature = util.getRequestAuthorization( method, resource, this.accessKeySecret, this.stsToken, params, headers );
   headers['Authorization'] = `LOG ${ this.accessKey }:${ signature }`;
@@ -141,42 +145,38 @@ client._send = function( method, project, body, resource, params, headers, callb
  */
 client._sendRequest = function(method, url, body, headers, callback) {
   let options = {
-    method : method,
     url : url,
-    headers : headers,
-    json : true
+    method : method,
+    headers : headers
   }
 
   if ( method === 'POST' || method === 'PUT' ) {
-    if ( Buffer.isBuffer(body) ) {
-      options['body'] = body;
-    } else {
-      try {
-        options['body'] = JSON.parse( body );
-      } catch ( err ) {
-        callback && callback( err );
-      }
-    }
+    options['body'] = body;
   }
 
   request(options, function( err, response, body ) {
     if ( err ) {
       callback && callback( err );
-      return;
-    }
-    let headers = response.headers;
-    if (response.statusCode === 200) {
-      callback && callback( null, headers, body );
     } else {
-      let requestId = headers['x-log-requestid'] ? headers['x-log-requestid'] : '';
+      try {
+        body = JSON.parse( body );
+      } catch( err ) {}
 
-      if ( body['errorCode'] && body['errorMessage'] ) {
-        let err = new Exception( body['errorCode'], body['errorMessage'], requestId );
-        callback && callback( err );
+      let headers = response.headers;
+
+      if (response.statusCode === 200) {
+        callback && callback( null, headers, body );
       } else {
-        let err = new Exception( 'RequestError', `Request is failed. Http code is 
-          ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId );
-        callback && callback( err );
+        let requestId = headers['x-log-requestid'] ? headers['x-log-requestid'] : '';
+
+        if ( body['errorCode'] && body['errorMessage'] ) {
+          let err = new Exception( body['errorCode'], body['errorMessage'], requestId );
+          callback && callback( err );
+
+        } else {
+          let err = new Exception( 'RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId );
+          callback && callback( err );
+        }
       }
     }
   })
@@ -212,11 +212,11 @@ client.CreateLogstore = function(options, callback) {
   let method = 'POST';
   let project = this.project;
   let resource = '/logstores';
+  headers["x-log-bodyrawsize"] = 0;
+  headers["Content-Type"] = "application/json";
   body['ttl'] = Number( options.ttl );
   body['logstoreName'] = options.logstoreName;
   body['shardCount'] = Number( options.shardCount );
-  headers["x-log-bodyrawsize"] = 0;
-  headers["Content-Type"] = "application/json";
   try {
     body = JSON.stringify( body );
   } catch( err ) {
@@ -238,39 +238,47 @@ client.PostLogStoreLogs = function( logstoreName, data, callback ) {
   let method = 'POST';
   let project = this.project;
   let resource = `/logstores/${ logstoreName }`;
-  if ( data.logs.length < 1 ) return ;
+  //接口每次可以写入的日志数据量上限4096条
   if ( data.logs.length > 4096 ) {
     throw new Exception ( 'InvalidLogSize', "logItems' length exceeds maximum limitation: 4096 lines." );
   }
+  //根据protobuf Message格式组装数据
+  let group = new Object();
+  group['topic'] = data.topic;
+  group['source'] = data.source;
+  group['logs'] = new Array();
 
-  let logGroup = new sls_pb.LogGroup();
-  logGroup.setTopic( data.topic );
-  logGroup.setSource( data.source );
-
-  data.logs.forEach( function( each, index ) {
-    let i = 0, log = new sls_pb.Log();
-    log.setTime( parseInt( each.time / 1000 ) );
-
-    for ( let prop in each.content) {
-      let content = new sls_pb.Log.Content();
-      content.setKey( prop );
-      content.setValue( each.content[prop] );
-      log.addContents( content, i);
-      i++;
-    }
-    logGroup.addLogs( log, index );
+  data.logs.forEach( function( logItem ) {
+    let log = new Object();
+    log['time'] = logItem.time;
+    log['contents'] = new Array();
+    logItem.contents.forEach( function( prop ) {
+      let content = new Object();
+      content['key'] = prop['key'];
+      content['value'] = prop['value'];
+      log.contents.push( content );
+    })
+    group['logs'].push( log );
   })
 
-  let body = logGroup;
-  let bodySize = body.length;
+  let LogGroup = Log.LogGroup;
+  //转换为Protocol Buffer
+  let logger = new LogGroup( group ).toBuffer();
+  let body = logger;
 
-  if ( bodySize > 3 * 1024 * 1024 ) {  // 3 MB
+  let bodySize = body.length;
+  //接口每次可以写入的日志数据量上限为3MB
+  if ( bodySize > 3 * 1024 * 1024 ) {  
     throw new Exception ( 'InvalidLogSize', "logItems' size exceeds maximum limitation: 3 MB." );
   }
   headers ["x-log-bodyrawsize"] = bodySize;
-  // headers ['x-log-compresstype'] = 'lz4';
+  headers ['x-log-compresstype'] = 'deflate';
   headers ['Content-Type'] = 'application/x-protobuf';
-
-  self._send( 'POST', self.project, body, resource, params, headers, callback);
+  //压缩内容
+  util.deflate( body, function( err, buf ) {
+    if (err) throw err;
+    self._send( 'POST', self.project, buf, resource, params, headers, callback);
+  })
+  
 }
 
