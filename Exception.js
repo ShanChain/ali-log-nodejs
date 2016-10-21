@@ -20,8 +20,7 @@ function Aliyun_Log_Exception(code, message, requestId) {
   return this;
 }
 
-// util.inherits(Aliyun_Log_Exception, Error);
-Object.setPrototypeOf(Aliyun_Log_Exception.prototype, Error.prototype);
+util.inherits(Aliyun_Log_Exception, Error);
 
 /**
  * The toString() method allows a class to decide how it will react when it is treated like a string.
