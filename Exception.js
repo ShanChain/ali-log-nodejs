@@ -7,15 +7,16 @@ let util = require('util');
  * @param {String} message   异常描述
  * @param {String} requestId 请求ID
  */
-function Aliyun_Log_Exception(code, message, requestId) {
-  let error = Error.call(this, message);
-  error.name = this.name = code;
-
-  this.message = error.message;
+function Aliyun_Log_Exception (code, message, requestId) {
+  let error = Error.call(this);
+  error.name = this.name = code || 'Error';
+  if (code) this.code = error.code = code;
+  if (message) this.message = error.message = message;
+  if (requestId) this.requestId = error.requestId = requestId;
   Object.defineProperty(this, 'stack', {
-      get: function () {
-          return error.stack;
-      }
+    get: function () {
+      return error.stack;
+    }
   })
   return this;
 }
