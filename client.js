@@ -92,7 +92,6 @@ client._send = function(method, project, body, resource, params, headers, callba
   headers['User-Agent'] = USER_AGENT;
   headers['x-log-apiversion'] = API_VERSION;
   headers['x-log-signaturemethod'] = 'hmac-sha1';
-
   if (this.stsToken !== '') {
     headers['x-acs-security-token'] = this.stsToken;
   }
@@ -102,10 +101,8 @@ client._send = function(method, project, body, resource, params, headers, callba
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
   headers['Date'] = util.getGMT();
-
   let signature = util.getRequestAuthorization(method, resource, this.accessKeySecret, this.stsToken, params, headers);
   headers['Authorization'] = `LOG ${ this.accessKey }:${ signature }`;
-
   let url = resource;
   if (!_.isEmpty( params )) {
     url += `?${ qs.stringify( params ) }`;
@@ -128,12 +125,46 @@ client._send = function(method, project, body, resource, params, headers, callba
   });
 }
 
+/**
+ * _getResponse
+ * @param  {[type]}   options  [description]
+ * @param  {Function} callback [description]
+ * @return {[type]}            [description]
+ */
+client._getResponse = function (options, callback) {
+  request(options, function(err, response, body) {
+    if (err) {
+      callback && callback(err);
+    } else {
+      try {
+        body = JSON.parse(body);
+      } catch(err) {}
+      let headers = response.headers;
+      let requestId = headers['x-log-requestid'] || '';
+      if (response.statusCode === 200) {
+        let res = new Object();
+        body && (res['res'] = body);
+        res['requestId'] = requestId;
+        callback && callback(null, res);
+      } else {
+        if (body['errorCode'] && body['errorMessage']) {
+          let err = new Exception(body['errorCode'], body['errorMessage'], requestId);
+          callback && callback(err);
+        } else {
+          let err = new Exception('RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId);
+          callback && callback(err);
+        }
+      }
+    }
+  })
+}
+
 
 /**
  * 发起调用阿里云API请求
  * @param  {String}   method   请求方法名称
  * @param  {String}   url      请求API地址
- * @param  {String|Protocol Buffer}   body   请求主体
+ * @param  {String|aa Buffer}   body   请求主体
  * @param  {Object}   headers  请求头部信息
  * @param  {Function} callback  回调函数 
  * @return void
@@ -145,27 +176,14 @@ client._sendRequest = function(method, url, body, headers, callback) {
     headers : headers
   }
   if (method == 'POST' || method == 'PUT') options['body'] = body;
-  request(options, function( err, response, body ) {
+  this._getResponse(options, function(err, res) {
     if (err) {
-      callback && callback(err); return;
-    } 
-    try {
-      body = JSON.parse(body);
-    } catch(err) {}
-    let headers = response.headers;
-    if (response.statusCode === 200) {
-      callback && callback( null, headers, body );
+      callback && callback(err);
     } else {
-      let requestId = headers['x-log-requestid'] ? headers['x-log-requestid'] : '';
-      if (body['errorCode'] && body['errorMessage']) {
-        let err = new Exception(body['errorCode'], body['errorMessage'], requestId);
-        callback && callback(err);
-      } else {
-        let err = new Exception('RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId);
-        callback && callback(err);
-      }
+      callback && callback(null, res);
     }
   })
+  
 }
 
 
@@ -175,14 +193,9 @@ client._sendRequest = function(method, url, body, headers, callback) {
  * @param  {Function} callback 回调函数
  * @return void
  */
-client.listLogstores = function(callback) {
-  let body = null;
-  let params = {};
-  let headers = {};
-  let method = 'GET';
+client.listLogstores = function(project, callback) {
   let resource = '/logstores';
-  let project = this.project;
-  this._send(method, project, body, resource, params, headers, callback);
+  this._send('GET', project, null, resource, {}, {}, callback);
 }
 
 
@@ -195,8 +208,7 @@ client.CreateLogstore = function(options, callback) {
   let body = {};
   let params = {};
   let headers = {};
-  let method = 'POST';
-  let project = this.project;
+  let project = options.project;
   let resource = '/logstores';
   headers["x-log-bodyrawsize"] = 0;
   headers["Content-Type"] = "application/json";
@@ -208,7 +220,7 @@ client.CreateLogstore = function(options, callback) {
   } catch(err) {
     callback && callback(err);
   }
-  this._send(method, project, body, resource, params, headers, callback);
+  this._send('POST', project, body, resource, params, headers, callback);
 }
 
 /**
@@ -217,12 +229,11 @@ client.CreateLogstore = function(options, callback) {
  * @param {Object}   data         日志信息
  * @param {Function} callback     回调函数
  */
-client.PostLogStoreLogs = function(logstoreName, data, callback) {
+client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   let self = this;
   let params = {};
   let headers = {};
-  let method = 'POST';
-  let project = this.project;
+  let project = project;
   let resource = `/logstores/${ logstoreName }`;
   //接口每次可以写入的日志数据量上限4096条
   if (data.logs.length > 4096) {
