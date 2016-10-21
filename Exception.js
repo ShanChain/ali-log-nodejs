@@ -8,13 +8,20 @@ let util = require('util');
  * @param {String} requestId 请求ID
  */
 function Aliyun_Log_Exception(code, message, requestId) {
-  Error.call(this);
-  this.code = code;
-  this.message = message;
-  this.requestId = requestId || '';
+  let error = Error.call(this, message);
+  error.name = this.name = code;
+
+  this.message = error.message;
+  Object.defineProperty(this, 'stack', {
+      get: function () {
+          return error.stack;
+      }
+  })
+  return this;
 }
 
-util.inherits(Aliyun_Log_Exception, Error);
+// util.inherits(Aliyun_Log_Exception, Error);
+Object.setPrototypeOf(Aliyun_Log_Exception.prototype, Error.prototype);
 
 /**
  * The toString() method allows a class to decide how it will react when it is treated like a string.
