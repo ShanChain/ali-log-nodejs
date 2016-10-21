@@ -4,7 +4,7 @@
   "description": "",
   "main": "client.js",
   "scripts": {
-    "test": "mocha test"
+    "test": "./node_modules/mocha/bin/mocha ./test"
   },
   "author": "",
   "license": "ISC",
@@ -14,5 +14,9 @@
     "md5": "^2.2.1",
     "protobufjs": "^5.0.1",
     "request": "^2.75.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.1.2"
   }
 }
