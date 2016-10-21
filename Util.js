@@ -15,8 +15,8 @@ module.exports = {
    * @param {String} str Content to signature
    * @return {String} Signature String
    */
-  md5 : function( str ) {
-    return md5( str );
+  md5 : function(str) {
+    return md5(str);
   },
   
   /**
@@ -25,9 +25,9 @@ module.exports = {
    * @param  {String} key     阿里云AccessKeySecret
    * @return {String} signature  签名字符串
    */
-  hmacSHA1 : function( content, secret ) {
-    let hmac = crypto.createHmac( 'sha1', secret );
-    let signature = hmac.update( content ).digest('base64');
+  hmacSHA1 : function(content, secret) {
+    let hmac = crypto.createHmac('sha1', secret);
+    let signature = hmac.update(content).digest('base64');
     return signature;
   },
 
@@ -36,14 +36,14 @@ module.exports = {
    * @param  {Object} headers 请求头部
    * @return {String} str  排序后的带有x-log- & x-acs-前缀的头部属性的拼接字符串
    */
-  canonicalizedLOGHeaders : function( headers ) {
+  canonicalizedLOGHeaders : function(headers) {
     let str = '';
     let first = true;
-    let keys = Object.keys( headers ).sort();
-    keys.forEach(function( key ) {
+    let keys = Object.keys(headers).sort();
+    keys.forEach(function(key) {
       key = key.toLowerCase();
-      if ( key.indexOf('x-log-') === 0 || key.indexOf('a-acs-') === 0 ) {
-        if ( first ) {
+      if (key.indexOf('x-log-') === 0 || key.indexOf('a-acs-') === 0 ) {
+        if (first) {
           first = false;
           str += `${ key }:${ headers[key] }`;
         } else {
@@ -61,13 +61,13 @@ module.exports = {
    * @return {String} resource CanonicalizedResource
    */
   canonicalizedResource : function( resource, params ) {
-    if ( !_.isEmpty(params) ) {
-      let keys = Object.keys( params ).sort();
+    if (!_.isEmpty(params)) {
+      let keys = Object.keys(params).sort();
       let urlString = '';
       let first = true;
-      keys.forEach(function( key ) {
+      keys.forEach(function(key) {
         key = key.toLowerCase();
-        if ( first ) {
+        if (first) {
           first = false;
           urlString += `${ key }=${ params[key] }`;
         } else {
@@ -89,16 +89,16 @@ module.exports = {
    * @param  {Object} headers  
    * @return {String}          
    */
-  getRequestAuthorization : function( method, resource, key, stsToken, params, headers ) {
-    if ( !key ) {
+  getRequestAuthorization : function(method, resource, key, stsToken, params, headers) {
+    if (!key) {
       return '';
     }
     let content = `${ method }\n`;
-    if ( headers['Content-MD5'] !== undefined ) {
+    if (headers['Content-MD5'] !== undefined) {
       content += `${headers['Content-MD5']}`;
     }
     content += `\n`;
-    if ( headers['Content-Type'] !== undefined ) {
+    if (headers['Content-Type'] !== undefined) {
       content += `${ headers['Content-Type'] }`;
     }
     content += `\n`;
@@ -106,7 +106,7 @@ module.exports = {
     content += `${ this.canonicalizedLOGHeaders(headers) }\n`;
     content += `${ this.canonicalizedResource(resource, params) }`;
 
-    return this.hmacSHA1( content, key );
+    return this.hmacSHA1(content, key);
   },
 
   /**
