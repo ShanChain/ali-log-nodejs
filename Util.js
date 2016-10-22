@@ -66,7 +66,6 @@ module.exports = {
       let urlString = '';
       let first = true;
       keys.forEach(function(key) {
-        key = key.toLowerCase();
         if (first) {
           first = false;
           urlString += `${ key }=${ params[key] }`;
