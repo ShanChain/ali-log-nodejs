@@ -78,7 +78,7 @@ client._setEndpoint = function( endpoint ) {
  * @return void
  */
 client._send = function(method, project, body, resource, params, headers, callback) {
-  if (body) {
+  if (!_.isEmpty(body)) {
     headers['Content-Length'] = body.length;
     if (headers['x-log-bodyrawsize'] === undefined) {
       headers['x-log-bodyrawsize'] = 0;
@@ -89,18 +89,16 @@ client._send = function(method, project, body, resource, params, headers, callba
     headers['x-log-bodyrawsize'] = 0;
     headers['Content-qType'] = '';  // If not set, http request will add automatically.
   }
+  headers['Date'] = util.getGMT();
   headers['User-Agent'] = USER_AGENT;
   headers['x-log-apiversion'] = API_VERSION;
   headers['x-log-signaturemethod'] = 'hmac-sha1';
-  if (this.stsToken !== '') {
-    headers['x-acs-security-token'] = this.stsToken;
-  }
+  if (this.stsToken !== '') headers['x-acs-security-token'] = this.stsToken;
   if (!project) {
     headers['Host'] = this.logHost;
   } else {
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
-  headers['Date'] = util.getGMT();
   let signature = util.getRequestAuthorization(method, resource, this.accessKeySecret, this.stsToken, params, headers);
   headers['Authorization'] = `LOG ${ this.accessKey }:${ signature }`;
   let url = resource;
@@ -193,9 +191,17 @@ client._sendRequest = function(method, url, body, headers, callback) {
  * @param  {Function} callback 回调函数
  * @return void
  */
-client.listLogstores = function(project, callback) {
+client.listLogstores = function(args, callback) {
+  let params = new Object();
+  let project = args.project;
+  if (project === undefined) {
+    throw Exception.ParameterInvalid("缺少参数project");
+  }
+  ( args.size !== undefined ) && ( params['size'] = args.size );
+  ( args.offset !== undefined ) && ( params['offset'] = args.offset );
+  args.logstoreName && ( params['logstoreName'] = args.logstoreName );
   let resource = '/logstores';
-  this._send('GET', project, null, resource, {}, {}, callback);
+  this._send('GET', project, null, resource, params, {}, callback);
 }
 
 
@@ -230,14 +236,16 @@ client.CreateLogstore = function(options, callback) {
  * @param {Function} callback     回调函数
  */
 client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
+  if (project === undefined) {
+    throw Exception.ParameterInvalid("缺少参数project");
+  }
   let self = this;
   let params = {};
   let headers = {};
-  let project = project;
   let resource = `/logstores/${ logstoreName }`;
   //接口每次可以写入的日志数据量上限4096条
   if (data.logs.length > 4096) {
-    throw new Exception ( 'InvalidLogSize', "logItems' length exceeds maximum limitation: 4096 lines." );
+    throw Exception.InvalidLogSize("logItems' length exceeds maximum limitation: 4096 lines." );
   }
   //根据protobuf Message格式组装数据
   let group = new Object();
@@ -266,7 +274,7 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   let bodySize = body.length;
   //接口每次可以写入的日志数据量上限为3MB
   if (bodySize > 3 * 1024 * 1024) {  
-    throw new Exception ('InvalidLogSize', "logItems' size exceeds maximum limitation: 3 MB.");
+    throw Exception.InvalidLogSize("logItems' size exceeds maximum limitation: 3 MB.");
   }
   headers ["x-log-bodyrawsize"] = bodySize;
   headers ['x-log-compresstype'] = 'deflate';
