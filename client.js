@@ -99,12 +99,13 @@ client._send = function(method, project, body, resource, params, headers, callba
   } else {
     headers['Host'] = `${ project }.${ this.logHost }`;
   }
+  //签名
   let signature = util.getRequestAuthorization(method, resource, this.accessKeySecret, this.stsToken, params, headers);
+  //Authorization头的格式 [ Authorization:LOG <AccessKeyId>:<Signature> ]
   headers['Authorization'] = `LOG ${ this.accessKey }:${ signature }`;
+
   let url = resource;
-  if (!_.isEmpty( params )) {
-    url += `?${ qs.stringify( params ) }`;
-  }
+  if (!_.isEmpty( params )) url += `?${ qs.stringify( params ) }`;
   if (this.isRowIp) {
     url = `http://${ this.endpoint }${ url }`;
   } else {
@@ -279,7 +280,7 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   headers ["x-log-bodyrawsize"] = bodySize;
   headers ['x-log-compresstype'] = 'deflate';
   headers ['Content-Type'] = 'application/x-protobuf';
-  //压缩内容
+  //deflate类型压缩内容 
   util.deflate( body, function(err, buf) {
     if (err) throw err;
     self._send('POST', self.project, buf, resource, params, headers, callback);
