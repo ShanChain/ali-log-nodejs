@@ -55,4 +55,20 @@ Aliyun_Log_Exception.prototype.getRequestId = function() {
   return this.requestId;
 }
 
+/**
+ * ParameterInvalid Exception
+ * @param {String} Error message 
+ */
+Aliyun_Log_Exception.ParameterInvalid = function(message) {
+  return new this('ParameterInvalid', message);
+}
+
+/**
+ * InvalidLogSize Exception
+ * @param {String} Error message 
+ */
+Aliyun_Log_Exception.InvalidLogSize = function(message) {
+  return new this('InvalidLogSize', message);
+}
+
 module.exports = Aliyun_Log_Exception;
