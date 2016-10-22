@@ -85,9 +85,9 @@ client._send = function(method, project, body, resource, params, headers, callba
     }
     headers['Content-MD5'] = util.md5(body).toUpperCase();
   } else {
+    headers['Content-qType'] = '';  // If not set, http request will add automatically.
     headers['Content-Length'] = 0;
     headers['x-log-bodyrawsize'] = 0;
-    headers['Content-qType'] = '';  // If not set, http request will add automatically.
   }
   headers['Date'] = util.getGMT();
   headers['User-Agent'] = USER_AGENT;
@@ -124,6 +124,7 @@ client._send = function(method, project, body, resource, params, headers, callba
   });
 }
 
+
 /**
  * _getResponse
  * @param  {[type]}   options  [description]
@@ -133,26 +134,25 @@ client._send = function(method, project, body, resource, params, headers, callba
 client._getResponse = function (options, callback) {
   request(options, function(err, response, body) {
     if (err) {
-      callback && callback(err);
+      callback && callback(err); return;
+    }
+    try {
+      body = JSON.parse(body);
+    } catch(err) {}
+    let headers = response.headers,
+        requestId = headers['x-log-requestid'] || '';
+    if (response.statusCode === 200) {
+      let res = new Object();
+      body && (res['res'] = body);
+      res['requestId'] = requestId;
+      callback && callback(null, res);
     } else {
-      try {
-        body = JSON.parse(body);
-      } catch(err) {}
-      let headers = response.headers;
-      let requestId = headers['x-log-requestid'] || '';
-      if (response.statusCode === 200) {
-        let res = new Object();
-        body && (res['res'] = body);
-        res['requestId'] = requestId;
-        callback && callback(null, res);
+      if (body['errorCode'] && body['errorMessage']) {
+        let err = new Exception(body['errorCode'], body['errorMessage'], requestId);
+        callback && callback(err);
       } else {
-        if (body['errorCode'] && body['errorMessage']) {
-          let err = new Exception(body['errorCode'], body['errorMessage'], requestId);
-          callback && callback(err);
-        } else {
-          let err = new Exception('RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId);
-          callback && callback(err);
-        }
+        let err = new Exception('RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId);
+        callback && callback(err);
       }
     }
   })
@@ -193,15 +193,16 @@ client._sendRequest = function(method, url, body, headers, callback) {
  * @return void
  */
 client.listLogstores = function(args, callback) {
-  let params = new Object();
-  let project = args.project;
+  let params = new Object(),
+      project = args.project,
+      resource = '/logstores';
+
   if (project === undefined) {
     throw Exception.ParameterInvalid("缺少参数project");
   }
   ( args.size !== undefined ) && ( params['size'] = args.size );
   ( args.offset !== undefined ) && ( params['offset'] = args.offset );
   args.logstoreName && ( params['logstoreName'] = args.logstoreName );
-  let resource = '/logstores';
   this._send('GET', project, null, resource, params, {}, callback);
 }
 
@@ -212,22 +213,33 @@ client.listLogstores = function(args, callback) {
  * @param {Function} callback     回调函数
  */
 client.CreateLogstore = function(options, callback) {
-  let body = {};
-  let params = {};
-  let headers = {};
-  let project = options.project;
-  let resource = '/logstores';
+  let body = {},
+      headers = {},
+      project = options.project,
+      resource = '/logstores';
   headers["x-log-bodyrawsize"] = 0;
   headers["Content-Type"] = "application/json";
-  body['ttl'] = Number(options.ttl);
-  body['logstoreName'] = options.logstoreName;
-  body['shardCount'] = Number(options.shardCount);
+  if (options.ttl === undefined) {
+    throw Exception.ParameterInvalid("缺少参数ttl");
+  } else {
+    body['ttl'] = Number(options.ttl);
+  }
+  if (options.shardCount === undefined) {
+    throw Exception.ParameterInvalid("缺少参数shardCount");
+  } else {
+    body['shardCount'] = Number(options.shardCount);
+  }
+  if (options.logstoreName === undefined) {
+    throw Exception.ParameterInvalid("缺少参数logstoreName");
+  } else {
+    body['logstoreName'] = options.logstoreName;
+  }
   try {
     body = JSON.stringify(body);
   } catch(err) {
     callback && callback(err);
   }
-  this._send('POST', project, body, resource, params, headers, callback);
+  this._send('POST', project, body, resource, {}, headers, callback);
 }
 
 /**
@@ -240,10 +252,9 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   if (project === undefined) {
     throw Exception.ParameterInvalid("缺少参数project");
   }
-  let self = this;
-  let params = {};
-  let headers = {};
-  let resource = `/logstores/${ logstoreName }`;
+  let self = this,
+      headers = {},
+      resource = `/logstores/${ logstoreName }`;
   //接口每次可以写入的日志数据量上限4096条
   if (data.logs.length > 4096) {
     throw Exception.InvalidLogSize("logItems' length exceeds maximum limitation: 4096 lines." );
@@ -283,7 +294,7 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   //deflate类型压缩内容 
   util.deflate( body, function(err, buf) {
     if (err) throw err;
-    self._send('POST', self.project, buf, resource, params, headers, callback);
+    self._send('POST', self.project, buf, resource, {}, headers, callback);
   })
   
 }
