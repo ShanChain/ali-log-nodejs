@@ -67,11 +67,26 @@ client._setEndpoint = function( endpoint ) {
 
 
 /**
+ * 检验参数project
+ * @param  {Object} args 请求参数
+ */
+client._checkProject = function(args) {
+  if (this.project && !args.project) {
+    args.project = this.project;
+  }
+  if (!args.project) {
+    throw Exception.ParameterProjectInvalid();
+  }
+  return args.project;
+}
+
+
+/**
  * 初始化请求信息
  * @param  {String}   method   请求方法名称
  * @param  {String}   project  日志项目名称
  * @param  {String|Buffer}   body  请求主体
- * @param  {String}   resource 
+ * @param  {String}   resource  资源地址
  * @param  {Object}   params   query 
  * @param  {Object}   headers  请求头部信息
  * @param  {Function} callback 回调函数
@@ -79,13 +94,16 @@ client._setEndpoint = function( endpoint ) {
  */
 client._send = function(method, project, body, resource, params, headers, callback) {
   if (!_.isEmpty(body)) {
-    headers['Content-Length'] = body.length;
     if (headers['x-log-bodyrawsize'] === undefined) {
       headers['x-log-bodyrawsize'] = 0;
     }
+    if (headers['Content-Type'] === undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+    headers['Content-Length'] = body.length;
     headers['Content-MD5'] = util.md5(body).toUpperCase();
   } else {
-    headers['Content-qType'] = '';  // If not set, http request will add automatically.
+    headers['Content-Type'] = '';  // If not set, http request will add automatically.
     headers['Content-Length'] = 0;
     headers['x-log-bodyrawsize'] = 0;
   }
@@ -169,11 +187,11 @@ client._getResponse = function (options, callback) {
  * @return void
  */
 client._sendRequest = function(method, url, body, headers, callback) {
-  let options = {
-    url : url,
-    method : method,
-    headers : headers
-  }
+  let options = {};
+  options['url'] = url;
+  options['method'] = method;
+  options['headers'] = headers;
+  //POST与PUT请求发送body
   if (method == 'POST' || method == 'PUT') options['body'] = body;
   this._getResponse(options, function(err, res) {
     if (err) {
@@ -188,52 +206,41 @@ client._sendRequest = function(method, url, body, headers, callback) {
 
 /**
  * 获取日志库列表
- * @param  {String}   project  项目名称
+ * @param  {String}   args  项目名称
  * @param  {Function} callback 回调函数
  * @return void
  */
 client.listLogstores = function(args, callback) {
+  let project = this._checkProject(args);
   let params = new Object(),
-      project = args.project,
-      resource = '/logstores';
-
-  if (project === undefined) {
-    throw Exception.ParameterInvalid("缺少参数project");
+      resource = `/logstores`;
+  if (args.size !== undefined) {
+    params['size'] = args['size'] ;
   }
-  ( args.size !== undefined ) && ( params['size'] = args.size );
-  ( args.offset !== undefined ) && ( params['offset'] = args.offset );
-  args.logstoreName && ( params['logstoreName'] = args.logstoreName );
+  if (args['offset'] !== undefined) {
+    params['offset'] = args.['offset'];
+  }
+  if (args['logstoreName'] !== undefined) {
+    params['logstoreName'] = args.['logstoreName'];
+  }
   this._send('GET', project, null, resource, params, {}, callback);
 }
 
 
 /**
  * 创建日志库 ( CreateLogstore )
- * @param {Object}   options      创建日志库信息
+ * @param {Object}   args      创建日志库信息
  * @param {Function} callback     回调函数
  */
-client.CreateLogstore = function(options, callback) {
+client.CreateLogstore = function(args, callback) {
+  let project = this._checkProject(args);
   let body = {},
       headers = {},
-      project = options.project,
-      resource = '/logstores';
+      resource = `/logstores`;
   headers["x-log-bodyrawsize"] = 0;
-  headers["Content-Type"] = "application/json";
-  if (options.ttl === undefined) {
-    throw Exception.ParameterInvalid("缺少参数ttl");
-  } else {
-    body['ttl'] = Number(options.ttl);
-  }
-  if (options.shardCount === undefined) {
-    throw Exception.ParameterInvalid("缺少参数shardCount");
-  } else {
-    body['shardCount'] = Number(options.shardCount);
-  }
-  if (options.logstoreName === undefined) {
-    throw Exception.ParameterInvalid("缺少参数logstoreName");
-  } else {
-    body['logstoreName'] = options.logstoreName;
-  }
+  body['ttl'] = Number(args['ttl']);
+  body['logstoreName'] = args['logstoreName'];
+  body['shardCount'] = Number(args['shardCount']);
   try {
     body = JSON.stringify(body);
   } catch(err) {
@@ -243,18 +250,89 @@ client.CreateLogstore = function(options, callback) {
 }
 
 /**
+ * 删除Logstore (包括所有shard数据，以及索引等)
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.DeleteLogstore = function (args, callback) {
+  let project = this._checkProject(args),
+      resource = `/logstores/${args.logstoreName}`;
+  this._send('DELETE', project, null, resource, {}, {}, callback);
+}
+
+/**
+ * 更新Logstore属性 (前只支持更新ttl，shard属性)
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.UpdateLogstore = function (args, callback) {
+  let project = this._checkProject(args);
+  let body = {},
+      resource = `/logstores/${args.logstoreName}`;
+  body['ttl'] = args['ttl'];
+  body['shardCount'] = args['shardCount'];
+  body['logstoreName'] = args['logstoreName'];
+  try {
+    body = JSON.stringify(body);
+  } catch(err) {
+    callback && callback(err);
+  }
+  this._send('PUT', project, body, resource, {}, {}, callback);
+}
+
+/**
+ * 查看Logstore属性
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.GetLogstore = function (args, callback) {
+  let project = this._checkProject(args);
+  let resource = `/logstores/${args.logstoreName}`;
+  this._send('GET', project, null, resource, {}, {}, callback);
+}
+
+
+/**
+ * 列出logstore下当前所有可用shard
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.ListShards = function (args, callback) {
+  let project = this._checkProject(args);
+  let resource = `/logstores/${args.logstoreName}/shards`;
+  this._send('GET', project, null, resource, {}, {}, callback);
+}
+
+
+
+client.SplitShard = function (args, callback) {
+  let project = this._checkProject(args);
+  let body = {};
+  let resource = `/logstores/${args.logstorename}/shards/${args.shardid}?action=split&key=${args.splitkey}`; 
+  body['logstoreName'] = args['logstoreName'];
+  body['shardid'] = args['shardid'];
+  body['splitkey'] = args['splitkey'];
+  try {
+    body = JSON.stringify(body);
+  } catch(err) {
+    callback && callback(err);
+  }
+  this._send('POST', project, body, resource, {}, {}, callback);
+}
+
+
+/**
  * 向指定LogStore写入日志数据
  * @param {String}   logstoreName LogStore名称
  * @param {Object}   data         日志信息
  * @param {Function} callback     回调函数
  */
-client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
-  if (project === undefined) {
-    throw Exception.ParameterInvalid("缺少参数project");
-  }
+client.PostLogStoreLogs = function(args, callback) {
   let self = this,
       headers = {},
-      resource = `/logstores/${ logstoreName }`;
+      data = args.data,
+      project = this._checkProject(args),
+      resource = `/logstores/${ args.logstoreName }`;
   //接口每次可以写入的日志数据量上限4096条
   if (data.logs.length > 4096) {
     throw Exception.InvalidLogSize("logItems' length exceeds maximum limitation: 4096 lines." );
@@ -264,19 +342,22 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   group['topic'] = data.topic;
   group['source'] = data.source;
   group['logs'] = new Array();
-
-  data.logs.forEach( function(logItem) {
-    let log = new Object();
-    log['time'] = logItem.time;
-    log['contents'] = new Array();
-    logItem.contents.forEach( function(prop) {
-      let content = new Object();
-      content['key'] = prop['key'];
-      content['value'] = prop['value'];
-      log.contents.push( content );
+  try {
+    data.logs.forEach( function(logItem) {
+      let log = new Object();
+      log['time'] = logItem.time;
+      log['contents'] = new Array();
+      logItem.contents.forEach( function(prop) {
+        let content = new Object();
+        content['key'] = prop['key'];
+        content['value'] = prop['value'];
+        log.contents.push( content );
+      })
+      group['logs'].push( log );
     })
-    group['logs'].push( log );
-  })
+  } catch (err) {
+    callback && callback(err); return;
+  }
 
   let LogGroup = Log.LogGroup;
   //转换为Protocol Buffer
@@ -294,7 +375,7 @@ client.PostLogStoreLogs = function(project, logstoreName, data, callback) {
   //deflate类型压缩内容 
   util.deflate( body, function(err, buf) {
     if (err) throw err;
-    self._send('POST', self.project, buf, resource, {}, headers, callback);
+    self._send('POST', project, buf, resource, {}, headers, callback);
   })
   
 }
