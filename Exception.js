@@ -63,6 +63,16 @@ Aliyun_Log_Exception.ParameterInvalid = function(message) {
   return new this('ParameterInvalid', message);
 }
 
+
+/**
+ * ParameterInvalid Exception
+ * @param {String} Error message 
+ */
+Aliyun_Log_Exception.ParameterProjectInvalid = function() {
+  return new this('ParameterInvalid', '缺少参数project');
+}
+
+
 /**
  * InvalidLogSize Exception
  * @param {String} Error message 
