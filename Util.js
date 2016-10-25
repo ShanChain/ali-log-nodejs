@@ -88,7 +88,7 @@ module.exports = {
    * @param  {Object} headers  
    * @return {String}          
    */
-  getRequestAuthorization : function(method, resource, key, stsToken, params, headers) {
+  getRequestAuthorization : function (method, resource, key, stsToken, params, headers) {
     if (!key) {
       return '';
     }
@@ -112,7 +112,7 @@ module.exports = {
    * 获取本地IP
    * @return {String} IP address
    */
-  getLocalIp : function() {
+  getLocalIp : function () {
     return ip.address();
   },
 
@@ -121,7 +121,7 @@ module.exports = {
    * @param  {String}  $gonten [description]
    * @return {Boolean}         [description]
    */
-  isIp : function( str ){
+  isIp : function ( str ) {
     ip = str.split('.');
     for ( let i = 0; i < ip.length; i++ ) {
       if ( ip[i] > 255 ) {
@@ -136,17 +136,28 @@ module.exports = {
    * @param  {Buffer}   pb 待压缩内容
    * @param  {Function} fn 回调函数
    */
-  deflate : function(pb, fn){
+  deflate : function (pb, fn) {
     zlib.deflate(pb, function(err, buf) {
       fn(err, buf);
     });
   },
 
   /**
+   * inflate解压
+   * @param  {Buffer}   buf 待解缩内容
+   * @param  {Function} fn  回调函数
+   */
+  inflate : function (buf, fn) {
+    zlib.inflate(buf, function(err, res) {
+      fn(err, res);
+    })
+  },
+
+  /**
    * 获取GMT格式时间
    * @return {String}  
    */
-  getGMT : function() {
+  getGMT : function () {
     return new Date().toUTCString();
   }
 
