@@ -200,7 +200,6 @@ client._sendRequest = function(method, url, body, headers, callback) {
       callback && callback(null, res);
     }
   })
-  
 }
 
 
@@ -218,10 +217,10 @@ client.listLogstores = function(args, callback) {
     params['size'] = args['size'] ;
   }
   if (args['offset'] !== undefined) {
-    params['offset'] = args.['offset'];
+    params['offset'] = args['offset'];
   }
   if (args['logstoreName'] !== undefined) {
-    params['logstoreName'] = args.['logstoreName'];
+    params['logstoreName'] = args['logstoreName'];
   }
   this._send('GET', project, null, resource, params, {}, callback);
 }
@@ -260,6 +259,7 @@ client.DeleteLogstore = function (args, callback) {
   this._send('DELETE', project, null, resource, {}, {}, callback);
 }
 
+
 /**
  * 更新Logstore属性 (前只支持更新ttl，shard属性)
  * @param {Object}   args     请求参数
@@ -279,6 +279,7 @@ client.UpdateLogstore = function (args, callback) {
   }
   this._send('PUT', project, body, resource, {}, {}, callback);
 }
+
 
 /**
  * 查看Logstore属性
@@ -304,20 +305,170 @@ client.ListShards = function (args, callback) {
 }
 
 
-
+/**
+ * Split一个指定的readwrite状态的shard
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
 client.SplitShard = function (args, callback) {
   let project = this._checkProject(args);
-  let body = {};
-  let resource = `/logstores/${args.logstorename}/shards/${args.shardid}?action=split&key=${args.splitkey}`; 
+  let body = {},
+      params = {},
+      resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`; 
   body['logstoreName'] = args['logstoreName'];
   body['shardid'] = args['shardid'];
   body['splitkey'] = args['splitkey'];
+  params['action'] = 'split';
+  params['key'] = args['args.splitkey'];
   try {
     body = JSON.stringify(body);
   } catch(err) {
     callback && callback(err);
   }
-  this._send('POST', project, body, resource, {}, {}, callback);
+  this._send('POST', project, body, resource, params, {}, callback);
+}
+
+
+/**
+ * Merge两个相邻的readwrite状态的shards
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.MergeShards = function (args, callback) {
+  let project = this._checkProject(args);
+  let body = {},
+      params = {},
+      resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
+  params['action'] = 'merge';
+  this._send('POST', project, body, resource, params, {}, callback);
+}
+
+
+/**
+ * 删除一个readonly状态的shard。
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.DeleteShard = function (args, callback) {
+  let project = this._checkProject(args);
+  let resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
+  this._send('DELETE', project, null, resource, {}, {}, callback);
+}
+
+
+/**
+ * 根据时间获得游标
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.GetCursor = function (args, callback) {
+  let project = this._checkProject(args);
+  let params = {};
+  params['type'] = 'cursor';
+  params['from'] = args['from'];
+  let resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
+  this._send('GET', project, null, resource, params, {}, callback);
+}
+
+
+/**
+ * 根据游标、数量获得日志
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.PullLogs = function (args, callback) {
+  let project = this._checkProject(args);
+  let params = {},
+      headers = {},
+      resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
+  params['type'] = 'logs';
+  params['count'] = args['count'];
+  params['cursor'] = args['cursor'];
+  headers['Accept-Encoding'] = 'deflate';
+  headers['Accept'] = 'application/x-protobuf';
+  this._send('GET', project, null, resource, params, headers, function(err, res) {
+    if (err) {
+      callback && callback(err);
+    } else {
+      let result = new Buffer(res.res, 'hex');
+      util.inflate(result, function(err, res) {
+        if (err) {
+          callback && callback(err);
+        } else {
+          result = Log.LogGroup.decode(res);
+          callback && callback(null, result);
+        }
+      })
+    }
+  });
+}
+
+
+/**
+ * 查询指定Project下某个Logstore中日志数据
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.GetLogs = function (args, callback) {
+  let project = this._checkProject(args);
+  let params = {},
+      headers = {},
+      resource = `/logstores/${args.logstoreName}`;
+    params['type'] = 'log';
+    params['from'] = args['from'];
+    params['to'] = args['to'];
+    if (args['line'] !== undefined) {
+      params['line'] = args['line'];
+    }
+    if (args['query'] !== undefined) {
+      params['query'] = args['query'];
+    }
+    if (args['topic'] !== undefined) {
+      params['topic'] = args['topic'];
+    }
+    if (args['offset'] !== undefined) {
+      params['offset'] = args['offset'];
+    }
+    if (args['reverse'] !== undefined) {
+      params['reverse'] = args['reverse'];
+    }
+    this._send('GET', project, null, resource, params, {}, callback);
+}
+
+
+/**
+ * 查询指定Project下某个Logstore中日志的分布情况
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.GetHistograms = function (args, callback) {
+  let project = this._checkProject(args);
+  let params = {},
+      resource = `/logstores/${args.logstoreName}`;
+  params['type'] = 'histogram';
+  params['from'] = args['from'];
+  params['to'] = args['to'];
+  args['topic'] && (params['topic'] = args['topic']);
+  args['query'] && (params['query'] = args['query']);
+  this._send('GET', project, null, resource, params, {}, callback);
+}
+
+
+/**
+ * 查询日志投递任务状态。
+ * @param {Object}   args     请求参数
+ * @param {Function} callback 回调函数
+ */
+client.GetShipperStatus = function (args, callback) {
+  let project = this._checkProject(args);
+  let params = {},
+      resource = `/logstores/${args.logstoreName}/shipper/${args.shipperName}/tasks`;
+  params['from'] = args['from'];
+  params['to'] = args['to'];
+  params['size'] && (params['size'] = args['size']);
+  params['status'] && (params['status'] = args['status']);
+  params['offset'] && (params['offset'] = args['offset']);
+  this._send('GET', project, null, resource, params, {}, callback);
 }
 
 
@@ -351,7 +502,7 @@ client.PostLogStoreLogs = function(args, callback) {
         let content = new Object();
         content['key'] = prop['key'];
         content['value'] = prop['value'];
-        log.contents.push( content );
+        log.contents.push(content);
       })
       group['logs'].push( log );
     })
@@ -372,7 +523,7 @@ client.PostLogStoreLogs = function(args, callback) {
   headers ["x-log-bodyrawsize"] = bodySize;
   headers ['x-log-compresstype'] = 'deflate';
   headers ['Content-Type'] = 'application/x-protobuf';
-  //deflate类型压缩内容 
+  // deflate类型压缩内容 
   util.deflate( body, function(err, buf) {
     if (err) throw err;
     self._send('POST', project, buf, resource, {}, headers, callback);
