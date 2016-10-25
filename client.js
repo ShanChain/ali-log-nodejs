@@ -43,20 +43,20 @@ function Aliyun_Log_Client( options ) {
  * @param {String} endpoint Endpoint
  */
 client._setEndpoint = function( endpoint ) {
-  let pos;
-  pos = endpoint.indexOf('://');
-  if (pos > -1) {
-    pos += 3;
-    endpoint = endpoint.substring( pos );
+  let position;
+  position = endpoint.indexOf('://');
+  if (position > -1) {
+    position += 3;
+    endpoint = endpoint.substring( position );
   }
-  pos = endpoint.indexOf('/');
-  if (pos > -1) {
-    endpoint = endpoint.substring( 0, pos );
+  position = endpoint.indexOf('/');
+  if (position > -1) {
+    endpoint = endpoint.substring( 0, position );
   }
-  pos = endpoint.indexOf(':');
-  if (pos > -1) {
-    this.port = Number(endpoint.substring( pos + 1 ));
-    endpoint = endpoint.substring( 0, pos );
+  position = endpoint.indexOf(':');
+  if (position > -1) {
+    this.port = Number(endpoint.substring( position + 1 ));
+    endpoint = endpoint.substring( 0, position );
   } else {
     this.port = 80;
   }
@@ -161,12 +161,12 @@ client._getResponse = function (options, callback) {
         requestId = headers['x-log-requestid'] || '';
     if (response.statusCode === 200) {
       let res = new Object();
-      body && (res['res'] = body);
-      res['requestId'] = requestId;
+      body && (res.res = body);
+      res.requestId = requestId;
       callback && callback(null, res);
     } else {
-      if (body['errorCode'] && body['errorMessage']) {
-        let err = new Exception(body['errorCode'], body['errorMessage'], requestId);
+      if (body.errorCode && body.errorMessage) {
+        let err = new Exception(body.errorCode, body.errorMessage, requestId);
         callback && callback(err);
       } else {
         let err = new Exception('RequestError', `Request is failed. Http code is ${ response.statusCode }.The return json is ${ JSON.stringify(body) }`, requestId);
@@ -188,11 +188,12 @@ client._getResponse = function (options, callback) {
  */
 client._sendRequest = function(method, url, body, headers, callback) {
   let options = {};
-  options['url'] = url;
-  options['method'] = method;
-  options['headers'] = headers;
+  options.url = url;
+  options.method = method;
+  options.headers = headers;
+  options.encoding = null;
   //POST与PUT请求发送body
-  if (method == 'POST' || method == 'PUT') options['body'] = body;
+  if (method == 'POST' || method == 'PUT') options.body = body;
   this._getResponse(options, function(err, res) {
     if (err) {
       callback && callback(err);
@@ -214,13 +215,13 @@ client.listLogstores = function(args, callback) {
   let params = new Object(),
       resource = `/logstores`;
   if (args.size !== undefined) {
-    params['size'] = args['size'] ;
+    params.size = args.size;
   }
-  if (args['offset'] !== undefined) {
-    params['offset'] = args['offset'];
+  if (args.offset !== undefined) {
+    params.offset = args.offset;
   }
-  if (args['logstoreName'] !== undefined) {
-    params['logstoreName'] = args['logstoreName'];
+  if (args.logstoreName !== undefined) {
+    params.logstoreName = args.logstoreName;
   }
   this._send('GET', project, null, resource, params, {}, callback);
 }
@@ -237,9 +238,9 @@ client.CreateLogstore = function(args, callback) {
       headers = {},
       resource = `/logstores`;
   headers["x-log-bodyrawsize"] = 0;
-  body['ttl'] = Number(args['ttl']);
-  body['logstoreName'] = args['logstoreName'];
-  body['shardCount'] = Number(args['shardCount']);
+  body.ttl = Number(args.ttl);
+  body.logstoreName = args.logstoreName;
+  body.shardCount = Number(args.shardCount);
   try {
     body = JSON.stringify(body);
   } catch(err) {
@@ -269,9 +270,9 @@ client.UpdateLogstore = function (args, callback) {
   let project = this._checkProject(args);
   let body = {},
       resource = `/logstores/${args.logstoreName}`;
-  body['ttl'] = args['ttl'];
-  body['shardCount'] = args['shardCount'];
-  body['logstoreName'] = args['logstoreName'];
+  body.ttl = args.ttl;
+  body.shardCount = args.shardCount;
+  body.logstoreName = args.logstoreName;
   try {
     body = JSON.stringify(body);
   } catch(err) {
@@ -315,11 +316,11 @@ client.SplitShard = function (args, callback) {
   let body = {},
       params = {},
       resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`; 
-  body['logstoreName'] = args['logstoreName'];
-  body['shardid'] = args['shardid'];
-  body['splitkey'] = args['splitkey'];
-  params['action'] = 'split';
-  params['key'] = args['args.splitkey'];
+  body.logstoreName = args.logstoreName;
+  body.shardid = args.shardid;
+  body.splitkey = args.splitkey;
+  params.action = 'split';
+  params.key = args.args.splitkey;
   try {
     body = JSON.stringify(body);
   } catch(err) {
@@ -364,8 +365,8 @@ client.DeleteShard = function (args, callback) {
 client.GetCursor = function (args, callback) {
   let project = this._checkProject(args);
   let params = {};
-  params['type'] = 'cursor';
-  params['from'] = args['from'];
+  params.type = 'cursor';
+  params.from = args.from;
   let resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
   this._send('GET', project, null, resource, params, {}, callback);
 }
@@ -376,29 +377,34 @@ client.GetCursor = function (args, callback) {
  * @param {Object}   args     请求参数
  * @param {Function} callback 回调函数
  */
+
+
 client.PullLogs = function (args, callback) {
   let project = this._checkProject(args);
   let params = {},
       headers = {},
       resource = `/logstores/${args.logstoreName}/shards/${args.shardid}`;
-  params['type'] = 'logs';
-  params['count'] = args['count'];
-  params['cursor'] = args['cursor'];
+  params.type = 'logs';
+  params.count = args.count;
+  params.cursor = args.cursor;
   headers['Accept-Encoding'] = 'deflate';
-  headers['Accept'] = 'application/x-protobuf';
+  headers.Accept = 'application/x-protobuf';
   this._send('GET', project, null, resource, params, headers, function(err, res) {
     if (err) {
       callback && callback(err);
     } else {
-      let result = new Buffer(res.res, 'hex');
-      util.inflate(result, function(err, res) {
-        if (err) {
-          callback && callback(err);
-        } else {
-          result = Log.LogGroup.decode(res);
-          callback && callback(null, result);
-        }
-      })
+      try {
+        util.inflate(res.res, function(err, res) {
+          if (err) {
+            callback && callback(err);
+          } else {
+            let result = Log.LogGroupList.decode(res);
+            callback && callback(null, result);
+          }
+        })
+      } catch(err) {
+        callback && callback(err);
+      }
     }
   });
 }
@@ -414,23 +420,23 @@ client.GetLogs = function (args, callback) {
   let params = {},
       headers = {},
       resource = `/logstores/${args.logstoreName}`;
-    params['type'] = 'log';
-    params['from'] = args['from'];
-    params['to'] = args['to'];
-    if (args['line'] !== undefined) {
-      params['line'] = args['line'];
+    params.type = 'log';
+    params.from = args.from;
+    params.to = args.to;
+    if (args.line !== undefined) {
+      params.line = args.line;
     }
-    if (args['query'] !== undefined) {
-      params['query'] = args['query'];
+    if (args.query !== undefined) {
+      params.query = args.query;
     }
-    if (args['topic'] !== undefined) {
-      params['topic'] = args['topic'];
+    if (args.topic !== undefined) {
+      params.topic = args.topic;
     }
-    if (args['offset'] !== undefined) {
-      params['offset'] = args['offset'];
+    if (args.offset !== undefined) {
+      params.offset = args.offset;
     }
-    if (args['reverse'] !== undefined) {
-      params['reverse'] = args['reverse'];
+    if (args.reverse !== undefined) {
+      params.reverse = args.reverse;
     }
     this._send('GET', project, null, resource, params, {}, callback);
 }
@@ -445,11 +451,11 @@ client.GetHistograms = function (args, callback) {
   let project = this._checkProject(args);
   let params = {},
       resource = `/logstores/${args.logstoreName}`;
-  params['type'] = 'histogram';
-  params['from'] = args['from'];
-  params['to'] = args['to'];
-  args['topic'] && (params['topic'] = args['topic']);
-  args['query'] && (params['query'] = args['query']);
+  params.type = 'histogram';
+  params.from = args.from;
+  params.to = args.to;
+  args.topic && (params.topic = args.topic);
+  args.query && (params.query = args.query);
   this._send('GET', project, null, resource, params, {}, callback);
 }
 
@@ -463,11 +469,11 @@ client.GetShipperStatus = function (args, callback) {
   let project = this._checkProject(args);
   let params = {},
       resource = `/logstores/${args.logstoreName}/shipper/${args.shipperName}/tasks`;
-  params['from'] = args['from'];
-  params['to'] = args['to'];
-  params['size'] && (params['size'] = args['size']);
-  params['status'] && (params['status'] = args['status']);
-  params['offset'] && (params['offset'] = args['offset']);
+  params.from = args.from;
+  params.to = args.to;
+  params.size && (params.size = args.size);
+  params.status && (params.status = args.status);
+  params.offset && (params.offset = args.offset);
   this._send('GET', project, null, resource, params, {}, callback);
 }
 
@@ -490,21 +496,21 @@ client.PostLogStoreLogs = function(args, callback) {
   }
   //根据protobuf Message格式组装数据
   let group = new Object();
-  group['topic'] = data.topic;
-  group['source'] = data.source;
-  group['logs'] = new Array();
+  group.topic = data.topic;
+  group.source = data.source;
+  group.logs = new Array();
   try {
     data.logs.forEach( function(logItem) {
       let log = new Object();
-      log['time'] = logItem.time;
-      log['contents'] = new Array();
+      log.time = logItem.time;
+      log.contents = new Array();
       logItem.contents.forEach( function(prop) {
         let content = new Object();
-        content['key'] = prop['key'];
-        content['value'] = prop['value'];
+        content.key = prop.key;
+        content.value = prop.value;
         log.contents.push(content);
       })
-      group['logs'].push( log );
+      group.logs.push( log );
     })
   } catch (err) {
     callback && callback(err); return;
