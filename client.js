@@ -11,7 +11,7 @@ let Exception = require('./Exception');
 const API_VERSION = '0.6.0';
 const USER_AGENT = 'log-nodejs-sdk';
 //日志数据Message文件路径
-const SLS_PROTO = path.join(process.cwd(), 'sls.proto');
+const SLS_PROTO = path.join(__dirname, 'sls.proto');
 
 
 //构建Message对象
@@ -191,7 +191,9 @@ client._sendRequest = function(method, url, body, headers, callback) {
   options.url = url;
   options.method = method;
   options.headers = headers;
-  options.encoding = null;
+  if (headers.Accept == 'application/x-protobuf') {
+    options.encoding = null;
+  }
   //POST与PUT请求发送body
   if (method == 'POST' || method == 'PUT') options.body = body;
   this._getResponse(options, function(err, res) {
